@@ -31,6 +31,7 @@ public class Prospector : MonoBehaviour {
     public List<CardProspector> tableau;
     public List<CardProspector> discardPile;
     public FloatingScore fsRun;
+    public SlotDef firstClickSD;
 
     private void Awake()
     {
@@ -152,7 +153,8 @@ public class Prospector : MonoBehaviour {
         }
 
         // Set up the initial target card
-        MoveToTarget(Draw());
+        // MoveToTarget(Draw());
+        target = null;
 
         // Set up the Draw pile
         UpdateDrawPile();
@@ -205,7 +207,7 @@ public class Prospector : MonoBehaviour {
         cd.faceUp = true;
         // Place it on top of the pile for depth sorting
         cd.SetSortingLayerName(layout.discardPile.layerName);
-        cd.SetSortOrder(-100 + discardPile.Count);
+        cd.SetSortOrder(-100 + discardPile.Count * 3);
     }
 
     // Make cd the new target card
@@ -217,7 +219,7 @@ public class Prospector : MonoBehaviour {
         cd.state = eCardState.target;
         cd.transform.parent = layoutAnchor;
         // Move to the target position
-        cd.transform.localPosition = new Vector3(layout.multiplier.x * layout.discardPile.x, layout.multiplier.y * layout.discardPile.y, -layout.discardPile.layerID);
+        cd.transform.localPosition = new Vector3(layout.multiplier.x * layout.targetSlot.x, layout.multiplier.y * layout.targetSlot.y, -layout.targetSlot.layerID);
         cd.faceUp = true; // Make it face-up
         // Set the depth sorting
         cd.SetSortingLayerName(layout.discardPile.layerName);
@@ -252,12 +254,16 @@ public class Prospector : MonoBehaviour {
         switch (cd.state)
         {
             case eCardState.target:
+                CardProspector tempcard = target;
+                target = null;
+                tempcard.slotDef = firstClickSD;
+                firstClickSD = null;
                 // Clicking the target card does nothing
                 break;
 
             case eCardState.drawpile:
                 // Clicking any card in the drawPile will draw the next card
-                MoveToDiscard(target); // Moves the target to the discardPile
+                //MoveToDiscard(target); // Moves the target to the discardPile
                 MoveToTarget(Draw()); // Moves the next drawn card to the target
                 UpdateDrawPile(); // Restacks the drawPile
                 ScoreManager.EVENT(eScoreEvent.draw);
@@ -265,6 +271,11 @@ public class Prospector : MonoBehaviour {
                 break;
 
             case eCardState.tableau:
+                if(target == null)
+                {
+                    firstClickSD = cd.slotDef;
+                    MoveToTarget(cd);
+                }
                 // Clicking a card in the tableau will check if it's a valid play
                 bool validMatch = true;
                 if (!cd.faceUp)
@@ -272,7 +283,7 @@ public class Prospector : MonoBehaviour {
                     // If the card is face-down, it's not valid
                     validMatch = false;
                 }
-                if(!AdjacentRank(cd, target))
+                if(!addto13(cd, target))
                 {
                     // If it's not an adjacent rank, it's not valid
                     validMatch = false;
@@ -281,7 +292,10 @@ public class Prospector : MonoBehaviour {
 
                 // If we got here then it's a valid card
                 tableau.Remove(cd); // Remove it from the tableau List
-                MoveToTarget(cd); // Make it the target card
+                MoveToDiscard(cd);
+                MoveToDiscard(target);
+                target = null;
+                //MoveToTarget(cd); // Make it the target card
                 SetTableauFaces(); // Update tableau card face-ups
                 ScoreManager.EVENT(eScoreEvent.mine);
                 FloatingScoreHandler(eScoreEvent.mine);
@@ -434,5 +448,13 @@ public class Prospector : MonoBehaviour {
                 }
                 break;
         }
+    }
+    public bool addto13(CardProspector c0, CardProspector c1)
+    {
+        if(c0.rank + c1.rank == 13)
+        {
+            return true;
+        }
+        return false;
     }
 }
